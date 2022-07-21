@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=2]
+
+[ext_resource path="res://Terrain.tscn" type="PackedScene" id=1]
+
+[node name="Node2D" type="Node2D"]
+
+[node name="Terrain" parent="." instance=ExtResource( 1 )]
+__meta__ = {
+"_editor_description_": "		"
+}
+enable_preview = true
+terrain_seed = 1103
+terrain_octaves = 7
+terrain_period = 150
+terrain_water_level = -0.2
+grass_seed = 28
+grass_octaves = 5
+grass_period = 50.0
+grass_lacunarity = 0.7
+grass_persistence = 0.0
