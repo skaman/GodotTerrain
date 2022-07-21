@@ -20,27 +20,44 @@ const WATER_TILES = {
 	corner_top_right_bottom_left = 27,
 	corner_top_left_bottom_right = 28,
 }
+const HILL_TILES = {
+	top_left = 29,
+	top = 30,
+	top_right = 31,
+	middle_left = 32,
+	middle = 37,
+	middle_right = 33,
+	bottom_left = 34,
+	bottom = 35,
+	bottom_right = 36,
+	corner_bottom_left = 38,
+	corner_bottom_right = 39,
+	corner_top_left = 40,
+	corner_top_right = 41
+}
 
-enum TileType { Grass, Water }
+enum TileType { Grass, Water, Hill }
 
 export (bool) var enable_preview = false setget _set_enable_preview
 export (int) var width = 256 setget _set_width
 export (int) var height = 256 setget _set_height
 
-export (int) var terrain_seed = 0 setget _set_terrain_seed
-export (int) var terrain_octaves = 1 setget _set_terrain_octaves
-export (float) var terrain_period = 150 setget _set_terrain_period
+export (int) var terrain_seed = 1101 setget _set_terrain_seed
+export (int) var terrain_octaves = 7 setget _set_terrain_octaves
+export (float) var terrain_period = 150.0 setget _set_terrain_period
 export (float) var terrain_lacunarity = 1.5 setget _set_terrain_lacunarity
 export (float) var terrain_persistence = 1.0 setget _set_terrain_persistence
-export (float) var terrain_water_level = -0.5 setget _set_terrain_water_level
+export (float) var terrain_water_level = -0.1 setget _set_terrain_water_level
+export (float) var terrain_hills_level = 0.1 setget _set_terrain_hills_level
+#export (int) var terrain_hills_max = 4 setget _set_terrain_hills_max
 #export (float) var terrain_noise_clamp_min = -0.5 setget _set_terrain_noise_clamp_min
 #export (float) var terrain_noise_clamp_max = 0.5 setget _set_terrain_noise_clamp_max
 
-export (int) var grass_seed = 0 setget _set_grass_seed
-export (int) var grass_octaves = 1 setget _set_grass_octaves
-export (float) var grass_period = 150 setget _set_grass_period
-export (float) var grass_lacunarity = 1.5 setget _set_grass_lacunarity
-export (float) var grass_persistence = 1.0 setget _set_grass_persistence
+export (int) var grass_seed = 28 setget _set_grass_seed
+export (int) var grass_octaves = 5 setget _set_grass_octaves
+export (float) var grass_period = 50.0 setget _set_grass_period
+export (float) var grass_lacunarity = 0.7 setget _set_grass_lacunarity
+export (float) var grass_persistence = 0.0 setget _set_grass_persistence
 #export (float) var grass_noise_clamp_min = -0.5 setget _set_grass_noise_clamp_min
 #export (float) var grass_noise_clamp_max = 0.5 setget _set_grass_noise_clamp_max
 
@@ -76,8 +93,12 @@ func _generate_world():
 			var tile_type = _get_tile_type(x, y)
 			if tile_type == TileType.Water:
 				_set_water_tile(x, y)
+			elif tile_type == TileType.Hill:
+				_set_hill_tile(x, y)
 			elif tile_type == TileType.Grass:
 				_set_grass_tile(x, y)
+				
+	$TileMap.update_bitmask_region()
 
 func _get_tile_type(x, y):
 	var noise_sample = terrain_noise.get_noise_2d(float(x), float(y))
@@ -91,6 +112,13 @@ func _get_tile_type(x, y):
 		noise_sample_top < terrain_water_level or noise_sample_bottom < terrain_water_level) and (
 			noise_sample_left < terrain_water_level or noise_sample_right < terrain_water_level):
 		return TileType.Water
+		
+	# same thing for the hills
+	if noise_sample > terrain_hills_level and (
+		noise_sample_top > terrain_hills_level or noise_sample_bottom > terrain_hills_level) and (
+			noise_sample_left > terrain_hills_level or noise_sample_right > terrain_hills_level):
+		return TileType.Hill
+		
 	return TileType.Grass
 
 func _set_water_tile(x, y):
@@ -136,17 +164,57 @@ func _set_water_tile(x, y):
 		$TileMap.set_cellv(Vector2(x, y), WATER_TILES.bottom)
 	else:
 		$TileMap.set_cellv(Vector2(x, y), WATER_TILES.middle)
+
+func _set_hill_tile(x, y):
+	var top_tile = _get_tile_type(x, y - 1)
+	var top_left_tile = _get_tile_type(x - 1, y - 1)
+	var top_right_tile = _get_tile_type(x + 1, y - 1)
+	var left_tile = _get_tile_type(x - 1, y)
+	var right_tile = _get_tile_type(x + 1, y)
+	var bottom_tile = _get_tile_type(x, y + 1)
+	var bottom_left_tile = _get_tile_type(x - 1, y + 1)
+	var bottom_right_tile = _get_tile_type(x + 1, y + 1)
+
+	if left_tile == TileType.Grass and bottom_tile == TileType.Hill and top_tile == TileType.Grass:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.top_left)
+	elif right_tile == TileType.Grass and bottom_tile == TileType.Hill and top_tile == TileType.Grass:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.top_right)
+		
+	elif left_tile == TileType.Grass and bottom_tile == TileType.Hill:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.middle_left)
+	elif right_tile == TileType.Grass and bottom_tile == TileType.Hill:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.middle_right)
+	elif left_tile == TileType.Grass:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.bottom_left)
+	elif right_tile == TileType.Grass:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.bottom_right)
+
+	elif top_tile == TileType.Grass:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.top)
+	elif bottom_tile == TileType.Grass:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.bottom)
+		
+	elif left_tile == TileType.Hill and bottom_tile == TileType.Hill and bottom_left_tile == TileType.Grass:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.corner_bottom_left)
+	elif right_tile == TileType.Hill and bottom_tile == TileType.Hill and bottom_right_tile == TileType.Grass:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.corner_bottom_right)
+	elif left_tile == TileType.Hill and top_tile == TileType.Hill and top_left_tile == TileType.Grass:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.corner_top_left)
+	elif right_tile == TileType.Hill and top_tile == TileType.Hill and top_right_tile == TileType.Grass:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.corner_top_right)
+	else:
+		$TileMap.set_cellv(Vector2(x, y), HILL_TILES.middle)
 			
 func _set_grass_tile(x, y):
-	$TileMap.set_cellv(Vector2(x, y), _get_grass_tile_index(grass_noise.get_noise_2d(float(x), float(y))));
+	$TileMap.set_cellv(Vector2(x, y), _get_grass_tile_index(grass_noise.get_noise_2d(float(x), float(y))))
 
 func _get_grass_tile_index(noise_sample):
-	var noise = clamp(noise_sample, -1.0, 1.0) +1 / 2
+	var noise = (clamp(noise_sample, -1.0, 1.0) + 1) / 2
 	if noise < 0 or noise > 1.0:
 		noise = 0
 		
-	var index = int(round(noise * (GRASS_TILES.size() - 1)));
-	return GRASS_TILES[index];
+	var index = int(round(noise * (GRASS_TILES.size() - 1)))
+	return GRASS_TILES[index]
 
 # PROPERTIES
 	
@@ -190,6 +258,14 @@ func _set_terrain_persistence(value):
 func _set_terrain_water_level(value):
 	terrain_water_level = value
 	_generate_world()
+
+func _set_terrain_hills_level(value):
+	terrain_hills_level = value
+	_generate_world()
+
+#func _set_terrain_hills_max(value):
+#	terrain_hills_max = value
+#	_generate_world()
 
 #func _set_terrain_noise_clamp_min(value):
 #	terrain_noise_clamp_min = value
